@@ -28,6 +28,10 @@ func main() {
 		})
 	})
 
+	e.Any("/any/*any", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	e.GET("/sns/:id", func(c *gin.Context) {
 		if "GET" == c.Request.Method {
 			id := c.Param("id")
