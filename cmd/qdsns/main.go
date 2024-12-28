@@ -5,9 +5,11 @@ import (
 	sns "github.com/aldrinleal/qdsns"
 	"github.com/gin-gonic/gin"
 	"github.com/joomcode/errorx"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"github.com/toorop/gin-logrus"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func getPort() string {
@@ -16,21 +18,37 @@ func getPort() string {
 	if newListenerPort, exists := os.LookupEnv("PORT"); exists {
 		listener = ":" + newListenerPort
 	}
+
 	return listener
 }
 
-func main() {
-	e := gin.Default()
+var log = logrus.New()
 
-	e.GET("/", func(c *gin.Context) {
+func main() {
+	log.SetFormatter(&logrus.JSONFormatter{})
+	log.SetReportCaller(true)
+	log.SetOutput(os.Stdout)
+	log.SetLevel(logrus.InfoLevel)
+
+	e := gin.Default()
+	e.Use(ginlogrus.Logger(log), gin.Recovery())
+
+	genericHandler := func(c *gin.Context) {
+		log.Infof("Request for %s", c.Request.URL)
+		for k, v := range c.Request.Header {
+			log.Infof(" %s: %s", k, strings.Join(v, "; "))
+		}
+
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
-	})
+	}
 
-	e.Any("/any/*any", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	e.GET("/", genericHandler)
+	e.GET("/health", genericHandler)
+	e.GET("/healthcheck", genericHandler)
+
+	e.Any("/any/*any", genericHandler)
 
 	e.GET("/sns/:id", func(c *gin.Context) {
 		if "GET" == c.Request.Method {
@@ -90,6 +108,8 @@ func main() {
 	})
 
 	listener := getPort()
+
+	log.Infof("Going to listen on %s", listener)
 
 	log.Fatalf("Oops: %s", http.ListenAndServe(listener, e))
 }
